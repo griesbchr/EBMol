@@ -1,0 +1,13 @@
+*.tar.xz
+*.tar.bz2
+*.pyc
+*.zip
+*.pkl
+*.npy
+*.pt
+*.pth
+*.txt
+*.xyz
+*.sdf
+geomr_eval_temp
+.vscode/*

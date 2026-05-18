@@ -1,0 +1,267 @@
+"""
+xTB Geometry Optimization and Energy Analysis Module
+
+This module provides functionality for running GFN2-xTB geometry optimizations
+on molecular structures and parsing the resulting output files. It handles the
+complete workflow from SDF input through xTB optimization to parsed results.
+
+xTB Output Parsing:
+The module parses specific patterns from xTB output files:
+- "total energy gain" lines provide energy differences in kcal/mol
+- "total RMSD" lines provide geometric changes in Angstroms
+- xtbtopo.mol files contain optimized geometries in MOL format
+"""
+
+import argparse
+import os
+import re
+import subprocess
+
+from rdkit import Chem
+from tqdm import tqdm
+
+
+def sdf_to_xyz(mol, filename):
+    """Convert RDKit mol object to XYZ format for xTB input."""
+    with open(filename, 'w') as f:
+        f.write(f"{mol.GetNumAtoms()}\n\n")
+        for atom in mol.GetAtoms():
+            pos = mol.GetConformer().GetAtomPosition(atom.GetIdx())
+            f.write(f"{atom.GetSymbol()} {pos.x} {pos.y} {pos.z}\n")
+
+
+def run_xtb_optimization(xyz_filename, output_prefix, charge):
+    """
+    Run xTB geometry optimization and capture output.
+    
+    This function executes the GFN2-xTB quantum chemistry program to perform
+    geometry optimization on a molecular structure. The optimization uses
+    the GFN2-xTB Hamiltonian with proper handling of molecular charge.
+    
+    xTB Command Structure:
+    - --opt: Enables geometry optimization
+    - --charge: Sets the total molecular charge for the calculation
+    - --namespace: Prefixes all output files to avoid conflicts in batch processing
+    
+    Args:
+        xyz_filename (str): Path to input XYZ coordinate file
+        output_prefix (str): Prefix for all xTB output files (prevents file conflicts)
+        charge (int): Total formal charge of the molecule
+        
+    Returns:
+        str: Complete xTB output text for parsing
+        
+    Note:
+        This function redirects xTB output to a file for reliable parsing,
+        as xTB writes important information to both stdout and stderr.
+    """
+    output_filename = f"{output_prefix}_xtb_output.out"
+
+    # Construct xTB command with proper charge handling
+    # The namespace flag ensures all intermediate files are prefixed
+    command = f"xtb {xyz_filename} --opt --charge {charge} --namespace {output_prefix} > {output_filename}"
+
+    subprocess.run(command, shell=True, stderr=subprocess.DEVNULL)
+    with open(output_filename, 'r') as f:
+        xtb_output = f.read()
+    return xtb_output
+
+
+def parse_xtb_output(xtb_output):
+    """
+    Parse xTB optimization output to extract energy and geometry changes.
+    
+    This function implements robust parsing of xTB output files, extracting
+    key metrics that indicate the quality of the initial molecular geometry.
+    
+    xTB Output Format Parsing:
+    - "total energy gain" lines: Energy difference between initial and optimized geometry
+      Format: "... total energy gain   :      -X.XXXX kcal/mol"
+      Position: Word index 6 contains the energy value
+      
+    - "total RMSD" lines: Root mean square deviation of atomic positions
+      Format: "... total RMSD          :       X.XXXX Angstrom"
+      Position: Word index 5 contains the RMSD value
+    
+    Args:
+        xtb_output (str): Complete text output from xTB optimization
+        
+    Returns:
+        tuple: (total_energy_gain, total_rmsd)
+            - total_energy_gain (float): Energy difference in kcal/mol (negative = stabilization)
+            - total_rmsd (float): Geometric change in Angstroms
+            - Returns (None, None) if parsing fails
+            
+    Example Output Lines:
+        "         total energy gain   :      -2.3456 kcal/mol"
+        "         total RMSD          :       0.1234 Angstrom"
+    """
+    total_energy_gain = None
+    total_rmsd = None
+
+    lines = xtb_output.splitlines()
+    for line in lines:
+        if "total energy gain" in line:
+            # Extract energy gain from position 6 in split line
+            total_energy_gain = float(line.split()[6])  # in kcal/mol
+        elif "total RMSD" in line:
+            # Extract RMSD from position 5 in split line
+            total_rmsd = float(line.split()[5])  # in Angstroms
+
+    return total_energy_gain, total_rmsd
+
+
+def parse_xtbtopo_mol(xtbtopo_filename):
+    """
+    Parse xTB topology file and return an RDKit molecule object.
+    
+    xTB generates xtbtopo.mol files containing the optimized molecular geometry
+    in MOL file format. These files preserve the connectivity from the original
+    structure while providing the optimized atomic coordinates.
+    
+    File Format Details:
+    - xtbtopo.mol files use standard MDL MOL format
+    - Connectivity is preserved from the original structure
+    - Coordinates reflect the xTB-optimized geometry
+    
+    Args:
+        xtbtopo_filename (str): Path to the xtbtopo.mol file generated by xTB
+        
+    Returns:
+        rdkit.Chem.Mol: RDKit molecule object with optimized coordinates
+        
+    Raises:
+        FileNotFoundError: If the xtbtopo.mol file doesn't exist
+        ValueError: If RDKit cannot parse the MOL file format
+    """
+    if not os.path.exists(xtbtopo_filename):
+        raise FileNotFoundError(f"No such file or directory: '{xtbtopo_filename}'")
+
+    with open(xtbtopo_filename, 'r') as f:
+        mol_block = f.read()
+        
+    # Parse MOL block without sanitization to preserve xTB results exactly
+    mol = Chem.MolFromMolBlock(mol_block, sanitize=False, removeHs=False)
+    if mol is None:
+        raise ValueError("Failed to create RDKit molecule from xtbtopo.mol")
+    return mol
+
+
+def write_mol_to_sdf(mol, f):
+    """Write the RDKit molecule object to an SDF file manually, including custom properties."""
+    mol_block = Chem.MolToMolBlock(mol, kekulize=False)
+    f.write(mol_block)
+    f.write("\n")
+    # Write properties
+    for prop_name in mol.GetPropNames():
+        prop_value = mol.GetProp(prop_name)
+        f.write(f">  <{prop_name}>\n{prop_value}\n\n")
+    f.write("$$$$\n")
+
+
+def remove_files_with_regex(directory, regex_pattern):
+    """
+    Remove files matching a regex pattern - implements file cleanup.
+    """
+    # Compile the regex pattern for efficient matching
+    pattern = re.compile(regex_pattern)
+
+    # Get all items in the directory
+    files = os.listdir(directory)
+
+    # Iterate and remove matching files only
+    for file_name in files:
+        file_path = os.path.join(directory, file_name)
+        # Safety check: only remove files (not directories) that match pattern
+        if pattern.match(file_name) and os.path.isfile(file_path):
+            os.remove(file_path)
+
+
+def get_molecule_charge(mol):
+    """Calculate the total formal charge of a molecule by summing the formal charges of its atoms."""
+    total_charge = 0
+    for atom in mol.GetAtoms():
+        total_charge += atom.GetFormalCharge()
+    return total_charge
+
+
+def process_molecule(args):
+    """Process a single molecule: run xTB optimization, parse output, and return the optimized molecule."""
+    i, mol = args
+    if mol is None:
+        return None, None, None
+
+    xyz_filename = f"mol_{i}.xyz"
+    output_prefix = f"mol_{i}"
+    xtb_topo_filename = f"{output_prefix}.xtbtopo.mol"
+
+    sdf_to_xyz(mol, xyz_filename)
+
+    # Get the formal charge of the molecule
+    charge = get_molecule_charge(mol)
+
+    try:
+        # Pass the charge to the xTB optimization
+        xtb_output = run_xtb_optimization(xyz_filename, output_prefix, charge)
+        total_energy_gain, total_rmsd = parse_xtb_output(xtb_output)
+
+        if not os.path.exists(xtb_topo_filename):
+            raise FileNotFoundError(f"Expected xtbtopo.mol file not found: '{xtb_topo_filename}'")
+
+        optimized_mol = parse_xtbtopo_mol(xtb_topo_filename)
+        return optimized_mol, total_energy_gain, total_rmsd
+
+    except Exception as e:
+        print(f"Error processing molecule {i}: {e}")
+        return None, None, None
+
+    finally:
+        if int(i) > 5:
+            remove_files_with_regex("./", r"^mol_{}.*".format(i))
+            remove_files_with_regex("./", r"^\.mol_{}.*".format(i))
+
+
+def write_results_to_file(output_sdf, optimized_mols, how="w"):
+    """Write the optimized molecules to the output SDF file."""
+    with open(output_sdf, how) as f:
+        for mol in optimized_mols:
+            write_mol_to_sdf(mol, f)
+
+def main_fn(input_sdf, output_sdf, init_sdf):
+    suppl = Chem.SDMolSupplier(input_sdf, sanitize=False, removeHs=False)
+    optimized_mols = []
+    init_mols = []
+
+    # Remove existing output file to start fresh
+    if os.path.exists(output_sdf):
+        os.remove(output_sdf)
+    try:
+        for task in tqdm(enumerate(suppl)):
+            optimized_mol, total_energy_gain, total_rmsd = process_molecule(task)
+            if optimized_mol is not None:
+                if task[1].HasProp("_Name"):
+                    optimized_mol.SetProp("_Name", task[1].GetProp("_Name"))
+                else:
+                    optimized_mol.SetProp("_Name", str(task[0]))
+                if total_energy_gain is not None:
+                    optimized_mol.SetProp("energy_gain", f"{total_energy_gain:.4f}")
+                if total_rmsd is not None:
+                    optimized_mol.SetProp("RMSD", f"{total_rmsd:.4f}")
+                init_mols.append(task[1])
+                optimized_mols.append(optimized_mol)
+    finally:
+        # Write remaining optimized molecules to the SDF file
+        if optimized_mols:
+            write_results_to_file(output_sdf, optimized_mols)
+            write_results_to_file(init_sdf, init_mols)
+
+    print(f"Successfully processed molecules.")
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--input_sdf", type=str, required=True, help="Path to input .sdf file")
+    parser.add_argument("--output_sdf", type=str, required=True, help="Path to output optimized .sdf")
+    parser.add_argument("--init_sdf", type=str, required=True, help="Path to output initial structures .sdf")
+    args = parser.parse_args()
+    main_fn(args.input_sdf, args.output_sdf, args.init_sdf)
