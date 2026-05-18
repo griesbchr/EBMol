@@ -7,7 +7,7 @@ EBMol learns an atom-additive scalar energy landscape whose local minima corresp
 - **Restoring Field Matching (RFM):** A simulation-free, flow-matching-inspired training objective that shapes the energy landscape with data points as local minima.
 - **Mirror-Langevin Algorithm (MLA):** A sampling framework that unifies Euclidean coordinate updates and simplex-constrained atom-type updates, combined with parallel tempering for inference-time compute scaling.
 
-EBMol is the first energy-based model for 3D molecular generation to achieve state-of-the-art performance:
+EBMol is the first energy-based model for 3D molecular generation to achieve state-of-the-art performance.
 
 > **Paper:** *Generating Physically Consistent Molecules with Energy-Based Models*
 
@@ -57,6 +57,7 @@ These scripts handle both sampling and evaluation. To configure:
  
 - **Sampling from a trained model:** Set the `exp_name` variable in the script to select the experiment directory under `experiments/`.
 - **Evaluating existing samples:** Set the `load_samples_name` variable to point to an `.xyz` file under `samples/`. This skips sampling and runs evaluation only.
+- **GEOM-Drugs Revisited evaluation:** In `run_geomr_evals.sh` set the `SDF_PATH` variable to the samples to be evaluated then run bash file. 
 ---
 
 ## Acknowledgements

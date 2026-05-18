@@ -1,14 +1,15 @@
 #!/bin/bash
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-#cd to geomr_eval_temp
-mkdir -p geomr_eval_temp
-cd geomr_eval_temp
+# cd to geomr_eval_temp (created next to the script)
+mkdir -p "$SCRIPT_DIR/geomr_eval_temp"
+cd "$SCRIPT_DIR/geomr_eval_temp"
 
-# 1. Define the directories and script paths
-EVAL_DIR="/home/griesbchr/Repositories/EBMol/geom-drugs-3dgen-evaluation"
+# The .sdf file path
+SDF_PATH="$SCRIPT_DIR/samples/geom_ls_msp_eregatom_n48_ws16_rlx200.sdf"
 
-# 2. Hardcode your specific .sdf file path here
-SDF_PATH="/home/griesbchr/Repositories/EBMol/samples/geom_ls_msp_eregatom_n48_ws16_rlx200.sdf"
+# Directories and script paths
+EVAL_DIR="$SCRIPT_DIR/geom-drugs-3dgen-evaluation"
 
 # Built paths from sdf_path
 INIT_SDF_PATH="${SDF_PATH%.sdf}_initial_structures.sdf"

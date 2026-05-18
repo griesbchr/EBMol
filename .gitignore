@@ -10,4 +10,5 @@
 *.xyz
 *.sdf
 geomr_eval_temp
+compressed
 .vscode/*

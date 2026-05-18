@@ -39,7 +39,7 @@ class EBM(nn.Module):
    
         if self.config["loss_type"] == "flow_matching":
             self.loss_function = self.flow_matching_loss
-        elif self.config["loss_type"] == "restoring_field_matching":
+        elif self.config["loss_type"] == "restoring_field_matching" or self.config["loss_type"] == "flow_matching_extrapolation":
             self.loss_function = partial(self.flow_matching_loss, extrapolation=True)
         else:
             raise ValueError(f"Loss type {self.config['loss_type']} not supported")
