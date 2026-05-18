@@ -16,7 +16,7 @@ EBMol is the first energy-based model for 3D molecular generation to achieve sta
 
 ```bash
 git clone https://github.com/griesbchr/EBMol.git
-cd ebmol
+cd EBMol
 conda env create -f ebmol.yaml
 conda activate ebmol
 ```
