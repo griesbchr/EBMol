@@ -145,7 +145,7 @@ if __name__ == '__main__':
                         help="Remove hydrogens from the dataset.")
     parser.add_argument("--data_dir",
                         type=str,
-                        default='/home/griesbchr/Repositories/toy_ebm/data/geom/raw/')
+                        default='/path/to/data/geom/raw/')
     parser.add_argument("--data_file", type=str, default="drugs_crude.msgpack")
     args = parser.parse_args()
     extract_conformers(args)

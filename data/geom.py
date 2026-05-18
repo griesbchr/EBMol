@@ -286,7 +286,7 @@ class GEOM(InMemoryDataset):
         return size_prior_list
     
 if __name__ == '__main__':
-    dataset = GEOM(root='/home/griesbchr/Repositories/toy_ebm/data/geom', split='train')
+    dataset = GEOM(root='/path/to/data/geom', split='train')
 
     std_per_molecule= []
     mol_sizes = []

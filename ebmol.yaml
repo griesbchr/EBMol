@@ -134,4 +134,3 @@ dependencies:
       - vendi-score==0.0.3
       - xxhash==3.7.0
       - yarl==1.23.0
-prefix: /home/griesbchr/miniconda3/envs/ebmol

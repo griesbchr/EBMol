@@ -440,7 +440,7 @@ class QM9(InMemoryDataset):
         return lambda n_atoms: (0.2938 * np.log(n_atoms +1 ) + -0.0479) * self.get_size_prior()
     
 if __name__ == '__main__':
-    dataset = QM9(root='/home/griesbchr/Repositories/toy_ebm/data/qm9', split='train')
+    dataset = QM9(root='/path/to/data/qm9', split='train')
 
     std_per_molecule= []
     mol_sizes = []
