@@ -9,7 +9,7 @@ EBMol learns an atom-additive scalar energy landscape whose local minima corresp
 
 EBMol is the first energy-based model for 3D molecular generation to achieve state-of-the-art performance.
 
-> **Paper:** *Generating Physically Consistent Molecules with Energy-Based Models*
+> **Paper:** [*Generating Physically Consistent Molecules with Energy-Based Models*](https://arxiv.org/abs/2605.18381)
 
 
 ## Installation
